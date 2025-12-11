@@ -1,0 +1,12 @@
+src/EAMamba/__pycache__/
+src/EAMamba/save/
+src/EAMamba/logs/
+src/EAMamba/assets/*
+src/EAMamba/logs/
+src/EAMamba/configs/*
+
+src/EAMamba/.DS_Store
+
+mamba_ssm-2.2.4+cu12torch2.1cxx11abiTRUE-cp310-cp310-linux_x86_64.whl
+
+.devcontainer
