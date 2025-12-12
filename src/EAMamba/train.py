@@ -16,12 +16,12 @@ from torch.optim import SGD, Adam, AdamW
 from torch.optim.lr_scheduler import MultiStepLR, CosineAnnealingLR
 from tqdm import tqdm
 
-import datasets
-import models
-import utils
-from datasets.prefetch_dataloader import CUDAPrefetcher, CPUPrefetcher
-from models.util.lr_scheduler import CosineAnnealingRestartCyclicLR
-from test import evaluate
+import src.EAMamba.datasets as datasets
+import src.EAMamba.models as models
+import src.EAMamba.utils as utils
+from src.EAMamba.datasets.prefetch_dataloader import CUDAPrefetcher, CPUPrefetcher
+from src.EAMamba.models.util.lr_scheduler import CosineAnnealingRestartCyclicLR
+from src.EAMamba.test import evaluate
 
 torch.cuda.empty_cache()
 

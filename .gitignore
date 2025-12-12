@@ -1,12 +1,35 @@
+# src
 src/EAMamba/__pycache__/
 src/EAMamba/save/
 src/EAMamba/logs/
-src/EAMamba/assets/*
+src/EAMamba/assets/
 src/EAMamba/logs/
-src/EAMamba/configs/*
-
 src/EAMamba/.DS_Store
+src/EAMamba/task_evaluation
+src/EAMamba/README.md
 
-mamba_ssm-2.2.4+cu12torch2.1cxx11abiTRUE-cp310-cp310-linux_x86_64.whl
+# datasets
+src/EAMamba/datasets/*
+!/src/EAMamba/datasets
+!/src/EAMamba/datasets/list
+!/src/EAMamba/datasets/list/src
 
+
+# config
+src/EAMamba/configs/*
+!/src/EAMamba/
+!/src/EAMamba/configs/realsrx2-eamamba.yaml
+
+# save
+save
+
+
+
+# Mamba
+mamba_ssm-2.2.4+cu12torch2.1cxx11abiFALSE-cp310-cp310-linux_x86_64.whl
+
+# Container
 .devcontainer
+
+#
+*.pyc

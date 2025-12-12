@@ -8,12 +8,12 @@ from torch.utils.data import Dataset
 
 from torchvision import transforms
 
-import datasets
+import src.EAMamba.datasets
 import scipy.io as sio
 
-from datasets import register
-from datasets.data_utils import calc_padding , read_img, rgb2ycbcr, paired_random_augmentation, padding
-from datasets.data_utils import PairedRandomCrop
+from src.EAMamba.datasets import register
+from src.EAMamba.datasets.data_utils import calc_padding , read_img, rgb2ycbcr, paired_random_augmentation, padding
+from src.EAMamba.datasets.data_utils import PairedRandomCrop
 
 @register('paired-dataset')
 class PairedDataset(Dataset):
