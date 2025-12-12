@@ -7,6 +7,9 @@ src/EAMamba/logs/
 src/EAMamba/.DS_Store
 src/EAMamba/task_evaluation
 src/EAMamba/README.md
+src/EAMamba/accelerate_2gpus.yaml
+src/EAMamba/accelerate_3gpus.yaml
+src/EAMamba/accelerate_4gpus.yaml
 
 # datasets
 src/EAMamba/datasets/*
