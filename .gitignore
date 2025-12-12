@@ -13,10 +13,9 @@ src/EAMamba/accelerate_8gpus.yaml
 
 # datasets
 src/EAMamba/datasets/*
-!/src/EAMamba/datasets
-!/src/EAMamba/datasets/list
-!/src/EAMamba/datasets/list/src
-
+!src/EAMamba/datasets/list/
+!src/EAMamba/datasets/data_utils/
+!src/EAMamba/datasets/*.py
 
 # config
 src/EAMamba/configs/*
