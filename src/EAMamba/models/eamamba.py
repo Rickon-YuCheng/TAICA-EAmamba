@@ -7,9 +7,9 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.checkpoint import checkpoint
 
-from src.EAMamba.models import register
-from src.EAMamba.models.module.mamba import ExtendedMamba
-from src.EAMamba.models.module.scan import ScanTransform
+from .models import register
+from .module.mamba import ExtendedMamba
+from .module.scan import ScanTransform
 
 ## Layer Norm
 def to_3d(x):

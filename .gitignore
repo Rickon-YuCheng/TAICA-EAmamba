@@ -8,8 +8,8 @@ src/EAMamba/.DS_Store
 src/EAMamba/task_evaluation
 src/EAMamba/README.md
 src/EAMamba/accelerate_2gpus.yaml
-src/EAMamba/accelerate_3gpus.yaml
 src/EAMamba/accelerate_4gpus.yaml
+src/EAMamba/accelerate_8gpus.yaml
 
 # datasets
 src/EAMamba/datasets/*
@@ -20,8 +20,12 @@ src/EAMamba/datasets/*
 
 # config
 src/EAMamba/configs/*
-!/src/EAMamba/
 !/src/EAMamba/configs/realsrx2-eamamba.yaml
+!/src/EAMamba/configs/test
+src/EAMamba/configs/test/*
+!/src/EAMamba/configs/test/sr
+src/EAMamba/configs/test/sr/*
+!/src/EAMamba/configs/test/sr/test-RealSRx2.yaml
 
 # save
 save

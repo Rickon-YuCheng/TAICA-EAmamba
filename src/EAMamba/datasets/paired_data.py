@@ -1,3 +1,4 @@
+print("DEBUG: paired_data.py has been loaded!")
 import cv2
 import random
 
@@ -8,12 +9,11 @@ from torch.utils.data import Dataset
 
 from torchvision import transforms
 
-import src.EAMamba.datasets
 import scipy.io as sio
 
-from src.EAMamba.datasets import register
-from src.EAMamba.datasets.data_utils import calc_padding , read_img, rgb2ycbcr, paired_random_augmentation, padding
-from src.EAMamba.datasets.data_utils import PairedRandomCrop
+from .datasets import register
+from .data_utils import calc_padding , read_img, rgb2ycbcr, paired_random_augmentation, padding
+from .data_utils import PairedRandomCrop
 
 @register('paired-dataset')
 class PairedDataset(Dataset):
