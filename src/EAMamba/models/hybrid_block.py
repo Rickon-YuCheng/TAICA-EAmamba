@@ -52,17 +52,33 @@ class LocalAttention(nn.Module):
             x = x[:, :, :H, :W]
         return x
 
-class GlobalAttention(nn.Module):
-    def __init__(self, dim, heads=8):
+class GlobalAttentionKVPool(nn.Module):
+    def __init__(self, dim, heads=8, kv_pool=4):
         super().__init__()
-        self.attn = nn.MultiheadAttention(dim, heads)
+        self.dim = dim
+        self.heads = heads
+        self.kv_pool = kv_pool
+        self.attn = nn.MultiheadAttention(dim, heads, batch_first=True)
+
+        # 用平均池化把 K/V token 數變少
+        self.pool = nn.AvgPool2d(kernel_size=kv_pool, stride=kv_pool)
 
     def forward(self, x):
+        # x: (B, C, H, W)
         B, C, H, W = x.shape
-        x_ = x.view(B, C, H*W).permute(2, 0, 1)
-        x_, _ = self.attn(x_, x_, x_)
-        x_ = x_.permute(1, 2, 0).view(B, C, H, W)
-        return x_
+
+        # Q: full tokens
+        q = x.flatten(2).transpose(1, 2)   # (B, HW, C)
+
+        # K/V: pooled tokens
+        xp = self.pool(x)                  # (B, C, H', W')
+        k = xp.flatten(2).transpose(1, 2)  # (B, H'W', C)
+        v = k
+
+        out, _ = self.attn(q, k, v, need_weights=False)  # (B, HW, C)
+        out = out.transpose(1, 2).view(B, C, H, W)
+        return out
+
 
 # --------------
 # Hybrid Block
@@ -81,31 +97,45 @@ class HybridBlock(nn.Module):
         self.norm_ffn    = LayerNorm(dim, layernorm_type)
 
         self.local_attn  = LocalAttention(dim, heads, window_size)
-        self.global_attn = GlobalAttention(dim, heads)
+        self.global_attn = GlobalAttentionKVPool(dim, heads)
 
         self.ffn = channel_mixer  # 直接用原本的 mixer (GDFN/Simple/FFN/CCA)
 
     def forward(self, x):
-        # Mamba block already contains its own norm+ffn inside, but you wrapped it as a module.
-        # Here we treat it as "token-mixer" stage with residual.
-        res = x
-        x = self.mamba(x)
-        x = x + res
-
-        # Local attn
-        res = x
-        x = self.local_attn(self.norm_local(x))
-        x = x + res
-
-        # Global attn
-        res = x
-        x = self.global_attn(self.norm_global(x))
-        x = x + res
-
-        # Channel mixer
+        # ---- Mamba sublayer ----
         res = x
         if self.use_checkpoint:
-            x = x + checkpoint(self.ffn, self.norm_ffn(x), use_reentrant=False)
+            def mamba_forward(t):
+                return self.mamba(t)
+            x = res + checkpoint(mamba_forward, x, use_reentrant=False)
         else:
-            x = x + self.ffn(self.norm_ffn(x))
+            x = res + self.mamba(x)
+
+        # ---- Local attn sublayer ----
+        res = x
+        if self.use_checkpoint:
+            def local_forward(t):
+                return self.local_attn(self.norm_local(t))
+            x = res + checkpoint(local_forward, x, use_reentrant=False)
+        else:
+            x = res + self.local_attn(self.norm_local(x))
+
+        # ---- Global attn sublayer ----
+        res = x
+        if self.use_checkpoint:
+            def global_forward(t):
+                return self.global_attn(self.norm_global(t))
+            x = res + checkpoint(global_forward, x, use_reentrant=False)
+        else:
+            x = res + self.global_attn(self.norm_global(x))
+
+        # ---- FFN / channel mixer sublayer ----
+        res = x
+        if self.use_checkpoint:
+            def ffn_forward(t):
+                return self.ffn(self.norm_ffn(t))
+            x = res + checkpoint(ffn_forward, x, use_reentrant=False)
+        else:
+            x = res + self.ffn(self.norm_ffn(x))
+
         return x

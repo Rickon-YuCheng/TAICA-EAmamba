@@ -130,17 +130,17 @@ class MambaOnlyBlock(nn.Module):
     def forward(self, x):
         b, c, h, w = x.shape
         x_size = (h, w)
-        res = x
 
         def mamba_forward(t):
             y = self.mamba(feature2token(self.norm(t)), x_size)
             return token2feature(y, x_size)
 
         if self.use_checkpoint:
-            x = res + checkpoint(mamba_forward, x, use_reentrant=False)
+            return checkpoint(mamba_forward, x, use_reentrant=False)
         else:
-            x = res + mamba_forward(x)
-        return x
+            return mamba_forward(x)
+
+
 
 # Metaformer-like mamba block
 class MambaFormerBlock(nn.Module):
@@ -199,6 +199,7 @@ def create_blocks(num_blocks, dim, ffn_expansion_factor, bias, layernorm_type, s
                 layernorm_type=layernorm_type,
                 scan_transform=scan_transform,
                 mamba_cfg=mamba_cfg,
+                use_checkpoint=use_checkpoint,
             )
 
             channel_mixer = get_channel_mixer_layer(channel_mixer_type, dim, ffn_expansion_factor, bias)
