@@ -10,59 +10,10 @@ from torch.utils.checkpoint import checkpoint
 from .models import register
 from .module.mamba import ExtendedMamba
 from .module.scan import ScanTransform
+from .hybrid_block import HybridBlock
+from .module.common import LayerNorm, to_3d, to_4d
 
-## Layer Norm
-def to_3d(x):
-    return rearrange(x, 'b c h w -> b (h w) c')
 
-def to_4d(x,h,w):
-    return rearrange(x, 'b (h w) c -> b c h w',h=h,w=w)
-
-class BiasFree_LayerNorm(nn.Module):
-    def __init__(self, normalized_shape):
-        super(BiasFree_LayerNorm, self).__init__()
-        if isinstance(normalized_shape, numbers.Integral):
-            normalized_shape = (normalized_shape,)
-        normalized_shape = torch.Size(normalized_shape)
-
-        assert len(normalized_shape) == 1
-
-        self.weight = nn.Parameter(torch.ones(normalized_shape))
-        self.normalized_shape = normalized_shape
-
-    def forward(self, x):
-        sigma = x.var(-1, keepdim=True, unbiased=False)
-        return x / torch.sqrt(sigma+1e-5) * self.weight
-
-class WithBias_LayerNorm(nn.Module):
-    def __init__(self, normalized_shape):
-        super(WithBias_LayerNorm, self).__init__()
-        if isinstance(normalized_shape, numbers.Integral):
-            normalized_shape = (normalized_shape,)
-        normalized_shape = torch.Size(normalized_shape)
-
-        assert len(normalized_shape) == 1
-
-        self.weight = nn.Parameter(torch.ones(normalized_shape))
-        self.bias = nn.Parameter(torch.zeros(normalized_shape))
-        self.normalized_shape = normalized_shape
-
-    def forward(self, x):
-        mu = x.mean(-1, keepdim=True)
-        sigma = x.var(-1, keepdim=True, unbiased=False)
-        return (x - mu) / torch.sqrt(sigma+1e-5) * self.weight + self.bias
-
-class LayerNorm(nn.Module):
-    def __init__(self, dim, layernorm_type='WithBias'):
-        super(LayerNorm, self).__init__()
-        if layernorm_type =='BiasFree':
-            self.body = BiasFree_LayerNorm(dim)
-        else:
-            self.body = WithBias_LayerNorm(dim)
-
-    def forward(self, x):
-        h, w = x.shape[-2:]
-        return to_4d(self.body(to_3d(x)), h, w)
 
 ## Input transform
 # BLC -> BCHW
@@ -168,6 +119,29 @@ class GDFN(nn.Module):
         x = self.project_out(x)
         return x
 
+
+class MambaOnlyBlock(nn.Module):
+    def __init__(self, dim, bias, layernorm_type, scan_transform, mamba_cfg=None, use_checkpoint=False):
+        super().__init__()
+        self.use_checkpoint = use_checkpoint
+        self.norm = LayerNorm(dim, layernorm_type)
+        self.mamba = ExtendedMamba(dim, scan_transform, **mamba_cfg)
+
+    def forward(self, x):
+        b, c, h, w = x.shape
+        x_size = (h, w)
+        res = x
+
+        def mamba_forward(t):
+            y = self.mamba(feature2token(self.norm(t)), x_size)
+            return token2feature(y, x_size)
+
+        if self.use_checkpoint:
+            x = res + checkpoint(mamba_forward, x, use_reentrant=False)
+        else:
+            x = res + mamba_forward(x)
+        return x
+
 # Metaformer-like mamba block
 class MambaFormerBlock(nn.Module):
     def __init__(self, dim, ffn_expansion_factor, bias, layernorm_type, scan_transform,
@@ -211,14 +185,38 @@ def get_channel_mixer_layer(type, dim, ffn_expansion_factor, bias):
         raise NotImplementedError(f'Channel mixer type {type} is not implemented.')
     
 def create_blocks(num_blocks, dim, ffn_expansion_factor, bias, layernorm_type, scan_transform,
-                    mamba_cfg, checkpoint_percentage, channel_mixer_type='GDFN'):
+                    mamba_cfg, checkpoint_percentage, channel_mixer_type='GDFN', *,
+                    hybrid=False, heads=8, window_size=7):
     blocks = []
     num_checkpointed = math.ceil(checkpoint_percentage * num_blocks)
     for i in range(num_blocks):
         use_checkpoint = i < num_checkpointed
-        block = MambaFormerBlock(dim=dim, ffn_expansion_factor=ffn_expansion_factor, bias=bias, 
-                                layernorm_type=layernorm_type, scan_transform=scan_transform, mamba_cfg=mamba_cfg, 
-                                use_checkpoint=use_checkpoint, channel_mixer_type=channel_mixer_type)
+
+        if hybrid:
+            mamba_layer = MambaOnlyBlock(
+                dim=dim,
+                bias=bias,
+                layernorm_type=layernorm_type,
+                scan_transform=scan_transform,
+                mamba_cfg=mamba_cfg,
+            )
+
+            channel_mixer = get_channel_mixer_layer(channel_mixer_type, dim, ffn_expansion_factor, bias)
+
+            block = HybridBlock(
+                mamba_layer=mamba_layer,
+                dim=dim,
+                channel_mixer=channel_mixer,
+                layernorm_type=layernorm_type,
+                heads=heads,
+                window_size=window_size,
+                use_checkpoint=use_checkpoint,
+            )
+
+        else:
+            block = MambaFormerBlock(dim=dim, ffn_expansion_factor=ffn_expansion_factor, bias=bias, 
+                                    layernorm_type=layernorm_type, scan_transform=scan_transform, mamba_cfg=mamba_cfg, 
+                                    use_checkpoint=use_checkpoint, channel_mixer_type=channel_mixer_type)
         blocks.append(block)
     return nn.Sequential(*blocks)
 
@@ -291,11 +289,25 @@ class EAMamba(nn.Module):
         channel_mixer_type='Simple',
         upscale=1,  
         mamba_cfg=None,
+
+        use_hybrid=True,
+        hybrid_stages=None,     # e.g. [False, False, True, True]
+        attn_heads=8,
+        window_size=7,
+        
+
+
         **kwargs        # This is to ignore any other arguments that are not used
     ):
 
         super(EAMamba, self).__init__()
+        if not use_hybrid:
+            hybrid_stages = [False] * len(num_blocks)
+        if hybrid_stages is None:
+            hybrid_stages = [False] * len(num_blocks)
 
+        assert len(hybrid_stages) == len(num_blocks), \
+            f"hybrid_stages length {len(hybrid_stages)} must match num_blocks length {len(num_blocks)}"
         self.upscale = upscale
         
         self.patch_embed = OverlapPatchEmbed(inp_channels, dim)
@@ -336,20 +348,23 @@ class EAMamba(nn.Module):
         self.down2_3 = Downsample(int(dim*2**1))
         
         self.encoder_level3 = create_blocks(
-            num_blocks=num_blocks[2], dim=int(dim*2**2), **shared_settings
+            num_blocks=num_blocks[2], dim=int(dim*2**2), **shared_settings, hybrid=hybrid_stages[2],
+            heads=attn_heads, window_size=window_size
         )
 
         self.down3_4 = Downsample(int(dim*2**2))
         
         self.latent = create_blocks(
-            num_blocks=num_blocks[3], dim=int(dim*2**3), **shared_settings
+            num_blocks=num_blocks[3], dim=int(dim*2**3), **shared_settings, hybrid=hybrid_stages[3],
+            heads=attn_heads, window_size=window_size
         )
         
         self.up4_3 = Upsample(int(dim*2**3))
         self.reduce_chan_level3 = nn.Conv2d(int(dim*2**3), int(dim*2**2), kernel_size=1, bias=bias)
         
         self.decoder_level3 = create_blocks(
-            num_blocks=num_blocks[2], dim=int(dim*2**2), **shared_settings
+            num_blocks=num_blocks[2], dim=int(dim*2**2), **shared_settings, hybrid=hybrid_stages[2],
+            heads=attn_heads, window_size=window_size
         )
 
         self.up3_2 = Upsample(int(dim*2**2))

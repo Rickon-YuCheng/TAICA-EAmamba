@@ -183,6 +183,7 @@ def train(accelerator, train_data, model, model_e, optimizer, scheduler,
 
 def main(accelerator, config, log, writer, save_path):
     timer = utils.Timer()
+    
 
     # data loaders
     train_loader, val_loader, num_train_data, batch_size, crop_size = make_data_loaders(accelerator=accelerator)
