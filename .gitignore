@@ -34,8 +34,5 @@ save
 # Mamba
 mamba_ssm-2.2.4+cu12torch2.1cxx11abiFALSE-cp310-cp310-linux_x86_64.whl
 
-# Container
-.devcontainer
-
 #
 *.pyc

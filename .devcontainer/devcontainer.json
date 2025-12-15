@@ -1,0 +1,20 @@
+{
+  "name": "PyTorch GPU Container",
+  "image": "pytorch/pytorch:2.1.1-cuda12.1-cudnn8-devel",
+  "runArgs": [
+    "--gpus=all",
+    "--ipc=host",
+    "--shm-size=2gb"
+  ],
+  "workspaceFolder": "/workspace",
+  "mounts": ["source=${localWorkspaceFolder},target=/workspace,type=bind"],
+  "postCreateCommand": "apt-get update && apt-get install -y git curl wget",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "ms-toolsai.jupyter"
+      ]
+    }
+  }
+}
