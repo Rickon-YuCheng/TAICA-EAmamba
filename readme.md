@@ -11,5 +11,5 @@ tensorboard --logdir /workspace/save/result21/tensorboard --port 6006 --bind_all
 
 ```
 PYTHONPATH=. python3 src/EAMamba/train.py --config src/EAMamba/configs/realsrx2-eamamba.yaml --name result
-PYTHONPATH=. python3 src/EAMamba/test.py --model save/_realsrx2-eamamba/current_iter-best.pth --dataset RealSRx2
+PYTHONPATH=. python3 src/EAMamba/test.py --model save/result3/current_iter-best.pth --dataset RealSRx2
 ```

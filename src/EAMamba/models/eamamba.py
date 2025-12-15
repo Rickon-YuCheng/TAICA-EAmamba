@@ -302,6 +302,9 @@ class EAMamba(nn.Module):
     ):
 
         super(EAMamba, self).__init__()
+        # print("hybrid_stages =", hybrid_stages)
+        # print("encoder3 hybrid =", hybrid_stages[2], "latent hybrid =", hybrid_stages[3])
+        # breakpoint()
         if not use_hybrid:
             hybrid_stages = [False] * len(num_blocks)
         if hybrid_stages is None:

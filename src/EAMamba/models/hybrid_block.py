@@ -52,32 +52,32 @@ class LocalAttention(nn.Module):
             x = x[:, :, :H, :W]
         return x
 
-class GlobalAttentionKVPool(nn.Module):
-    def __init__(self, dim, heads=8, kv_pool=4):
-        super().__init__()
-        self.dim = dim
-        self.heads = heads
-        self.kv_pool = kv_pool
-        self.attn = nn.MultiheadAttention(dim, heads, batch_first=True)
+# class GlobalAttentionKVPool(nn.Module):
+#     def __init__(self, dim, heads=8, kv_pool=4):
+#         super().__init__()
+#         self.dim = dim
+#         self.heads = heads
+#         self.kv_pool = kv_pool
+#         self.attn = nn.MultiheadAttention(dim, heads, batch_first=True)
 
-        # 用平均池化把 K/V token 數變少
-        self.pool = nn.AvgPool2d(kernel_size=kv_pool, stride=kv_pool)
+#         # 用平均池化把 K/V token 數變少
+#         self.pool = nn.AvgPool2d(kernel_size=kv_pool, stride=kv_pool)
 
-    def forward(self, x):
-        # x: (B, C, H, W)
-        B, C, H, W = x.shape
+#     def forward(self, x):
+#         # x: (B, C, H, W)
+#         B, C, H, W = x.shape
 
-        # Q: full tokens
-        q = x.flatten(2).transpose(1, 2)   # (B, HW, C)
+#         # Q: full tokens
+#         q = x.flatten(2).transpose(1, 2)   # (B, HW, C)
 
-        # K/V: pooled tokens
-        xp = self.pool(x)                  # (B, C, H', W')
-        k = xp.flatten(2).transpose(1, 2)  # (B, H'W', C)
-        v = k
+#         # K/V: pooled tokens
+#         xp = self.pool(x)                  # (B, C, H', W')
+#         k = xp.flatten(2).transpose(1, 2)  # (B, H'W', C)
+#         v = k
 
-        out, _ = self.attn(q, k, v, need_weights=False)  # (B, HW, C)
-        out = out.transpose(1, 2).view(B, C, H, W)
-        return out
+#         out, _ = self.attn(q, k, v, need_weights=False)  # (B, HW, C)
+#         out = out.transpose(1, 2).view(B, C, H, W)
+#         return out
 
 
 # --------------
@@ -93,11 +93,11 @@ class HybridBlock(nn.Module):
         self.mamba = mamba_layer
 
         self.norm_local  = LayerNorm(dim, layernorm_type)
-        self.norm_global = LayerNorm(dim, layernorm_type)
+        # self.norm_global = LayerNorm(dim, layernorm_type)
         self.norm_ffn    = LayerNorm(dim, layernorm_type)
 
         self.local_attn  = LocalAttention(dim, heads, window_size)
-        self.global_attn = GlobalAttentionKVPool(dim, heads)
+        # self.global_attn = GlobalAttentionKVPool(dim, heads)
 
         self.ffn = channel_mixer  # 直接用原本的 mixer (GDFN/Simple/FFN/CCA)
 
@@ -120,14 +120,14 @@ class HybridBlock(nn.Module):
         else:
             x = res + self.local_attn(self.norm_local(x))
 
-        # ---- Global attn sublayer ----
-        res = x
-        if self.use_checkpoint:
-            def global_forward(t):
-                return self.global_attn(self.norm_global(t))
-            x = res + checkpoint(global_forward, x, use_reentrant=False)
-        else:
-            x = res + self.global_attn(self.norm_global(x))
+        # # ---- Global attn sublayer ----
+        # res = x
+        # if self.use_checkpoint:
+        #     def global_forward(t):
+        #         return self.global_attn(self.norm_global(t))
+        #     x = res + checkpoint(global_forward, x, use_reentrant=False)
+        # else:
+        #     x = res + self.global_attn(self.norm_global(x))
 
         # ---- FFN / channel mixer sublayer ----
         res = x

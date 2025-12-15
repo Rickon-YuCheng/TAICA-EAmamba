@@ -37,7 +37,7 @@ model:
     checkpoint_percentage: !!float 0.0    # ceil(percentage * num_blocks[i]) = # of segment for stage i
     channel_mixer_type: 'Simple'    # Change the channel mixer of every blocks, default to Simple, can be GDFN, FFN, CCA
     # SimpleGate require dim*ffn_expansion_factor to be even
-    hybrid_stages: [False, False, True, True]  # stage2/stage3/stage4?
+    hybrid_stages: [False, False, False, True]  # stage2/stage3/stage4?
     attn_heads: 8
     window_size: 7
     use_hybrid: true
@@ -72,7 +72,7 @@ lr_scheduler:
     restart_weights: [1]
     eta_mins: [0.0003]  
 
-total_iter: 4000  # 30000
+total_iter: 30000  # 30000
 use_grad_clip: true
 
 print_freq: 3000  # 3000
